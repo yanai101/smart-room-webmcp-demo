@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Room — Playwright MCP vs WebMCP</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!--
+      The room lives entirely inside <canvas>.
+      There is nothing here that represents the room in the DOM.
+      This is the point.
+    -->
+
+    <nav id="topbar">
+      <div id="nav-left">
+        <button id="btn-prev" class="nav-btn" title="Previous stage (←)">◀ Prev</button>
+        <button id="btn-next" class="nav-btn" title="Next stage (→ / Space)">Next ▶</button>
+        <div id="progress-track"><!-- dots injected by JS --></div>
+      </div>
+      <div id="nav-right">
+        <button id="btn-reset" class="nav-btn icon-btn" title="Reset room">↺ Reset</button>
+        <button id="btn-speaker" class="nav-btn speaker-btn" title="Speaker Mode">⦿ Speaker</button>
+        <button id="btn-final" class="nav-btn final-btn" title="Go to Final Slide">Final Slide →</button>
+      </div>
+    </nav>
+
+    <main id="app">
+      <canvas id="room"></canvas>
+      <aside id="panel"><!-- stage content injected by JS --></aside>
+    </main>
+
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
