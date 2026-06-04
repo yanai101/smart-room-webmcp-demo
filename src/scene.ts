@@ -58,9 +58,13 @@ let screenGlow: THREE.PointLight;
 // Animated meshes
 let leftCurtain: THREE.Mesh;
 let rightCurtain: THREE.Mesh;
+let windowGlowMat: THREE.MeshBasicMaterial;  // warm overlay on the window pane
+let windowLight: THREE.SpotLight;
 
-const CURTAIN_OPEN   = { left: 2.35,  right: 5.65 };
-const CURTAIN_CLOSED = { left: 3.25,  right: 4.75 };
+const CURTAIN_OPEN          = { left: 2.35,  right: 5.65 };
+const CURTAIN_CLOSED        = { left: 3.25,  right: 4.75 };
+const WINDOW_LIGHT_MAX   = 18;   // subtle — ceiling light stays dominant
+const WINDOW_GLOW_OPACITY = 0.55; // daylight overlay on the window pane
 
 // State diff tracking for subscriber
 let prevState: RoomState | null = null;
@@ -144,17 +148,23 @@ function animateTurnOffDeskLamp() {
 
 function animateCloseCurtains() {
   const lx = leftCurtain.position.x, rx = rightCurtain.position.x;
+  const li = windowLight.intensity, lo = windowGlowMat.opacity;
   tween(1.2, p => {
     leftCurtain.position.x  = lx + (CURTAIN_CLOSED.left  - lx)*p;
     rightCurtain.position.x = rx + (CURTAIN_CLOSED.right - rx)*p;
+    windowLight.intensity   = li * (1 - p);
+    windowGlowMat.opacity   = lo * (1 - p);
   });
 }
 
 function animateOpenCurtains() {
   const lx = leftCurtain.position.x, rx = rightCurtain.position.x;
+  const li = windowLight.intensity, lo = windowGlowMat.opacity;
   tween(1.2, p => {
     leftCurtain.position.x  = lx + (CURTAIN_OPEN.left  - lx)*p;
     rightCurtain.position.x = rx + (CURTAIN_OPEN.right - rx)*p;
+    windowLight.intensity   = li + (WINDOW_LIGHT_MAX   - li)*p;
+    windowGlowMat.opacity   = lo + (WINDOW_GLOW_OPACITY - lo)*p;
   });
 }
 
@@ -178,6 +188,8 @@ function applyStateInstantly(s: RoomState) {
   }
   leftCurtain.position.x  = s.curtains === 'closed' ? CURTAIN_CLOSED.left  : CURTAIN_OPEN.left;
   rightCurtain.position.x = s.curtains === 'closed' ? CURTAIN_CLOSED.right : CURTAIN_OPEN.right;
+  windowLight.intensity = s.curtains === 'closed' ? 0 : WINDOW_LIGHT_MAX;
+  windowGlowMat.opacity = s.curtains === 'closed' ? 0 : WINDOW_GLOW_OPACITY;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
@@ -309,6 +321,26 @@ export function initScene(canvasEl: HTMLCanvasElement): void {
   // ── Curtains ────────────────────────────────────────────────────────────
   leftCurtain  = box(1.25,4.2,0.12, CURTAIN_OPEN.left,  5.5,-6.77, mCurtain);
   rightCurtain = box(1.25,4.2,0.12, CURTAIN_OPEN.right, 5.5,-6.77, mCurtain);
+
+  // ── Daylight from window ─────────────────────────────────────────────────
+  // SpotLight outside the window — warm daylight, fades when curtains close.
+  windowLight = new THREE.SpotLight(0xfff5d0, WINDOW_LIGHT_MAX, 0, Math.PI / 3.5, 0.7, 2);
+  windowLight.position.set(5, 10, -11);
+  windowLight.target.position.set(1.5, 0, -3);
+  scene.add(windowLight, windowLight.target);
+
+  // White daylight overlay on the window pane — makes the window look bright.
+  // Fades out when the curtains close so the room returns to ceiling-light-only state.
+  windowGlowMat = new THREE.MeshBasicMaterial({
+    color: 0xc8deff,          // cool white-blue daylight haze
+    transparent: true,
+    opacity: WINDOW_GLOW_OPACITY,
+    depthWrite: false,
+    // Normal blending — transparent overlay, keeps night sky partially visible
+  });
+  const windowGlow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.5), windowGlowMat);
+  windowGlow.position.set(4.0, 5.5, -6.65);  // in front of the night-sky plane
+  scene.add(windowGlow);
 
   // ── Chair ───────────────────────────────────────────────────────────────
   box(2,0.18,1.9,     0,1.2, -0.9, mChair);
