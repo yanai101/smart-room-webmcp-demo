@@ -16,9 +16,34 @@ No snapshots. No reasoning about DOM structure. No multi-step navigation. One ca
 
 ---
 
-## How it works in this app
+## Architecture
 
-The Smart Room registers real tools via `navigator.modelContext.registerTool()` at startup:
+```
+roomActions.ts          (pure capability layer — no DOM, no Three.js)
+     ↓ setRoomState()
+roomState.ts            (module state, subscription system)
+     ↓ subscribe
+scene.ts                (Three.js animations, reacts to state changes)
+
+webmcpTools.ts          (WEBMCP_TOOLS — single source of truth for tool definitions)
+     ↓
+registerWebMcpTools.ts  (registers tools via navigator.modelContext)
+
+exposeTestApi.ts        (window.smartRoom — same roomActions, for DevTools/tests)
+```
+
+`WEBMCP_TOOLS` in `src/webmcp/webmcpTools.ts` is the **single source of truth** for all WebMCP tool definitions. It is used by:
+- `registerWebMcpTools.ts` — for real `navigator.modelContext.registerTool()` registration
+- `stageData.ts` (Stage 4 panel) — for the visual tool discovery list and "What WebMCP Sees" comparison
+- Stage 4 run sequence — for Phase 1 (tool discovery) log animation
+
+There is no duplication of tool names or descriptions.
+
+---
+
+## How registration works
+
+At startup, `src/main.ts` calls `registerWebMcpTools()`. Each tool in `WEBMCP_TOOLS` is registered via `navigator.modelContext.registerTool()` if the API is available. The tool's `execute()` callback calls the same `roomActions` functions that the app uses internally.
 
 ```typescript
 navigator.modelContext.registerTool({
@@ -31,14 +56,12 @@ navigator.modelContext.registerTool({
     },
     required: ["mode"]
   },
-  async execute(args) {
-    setRoomMode(args.mode);          // calls the real room action
+  execute(args) {
+    setRoomMode(args.mode);  // same roomActions function the app uses
     return { success: true, state: getRoomState() };
   }
 });
 ```
-
-All five tools are registered from the same `WEBMCP_TOOLS` array that drives the visual tool list in the panel. Single source of truth.
 
 ---
 
@@ -46,15 +69,15 @@ All five tools are registered from the same `WEBMCP_TOOLS` array that drives the
 
 `navigator.modelContext` is not yet in any stable browser. The app handles this gracefully:
 
-- **WebMCP available**: tools register, the Stage 4 badge shows green "N tools registered"
-- **WebMCP unavailable**: the badge shows amber "WebMCP unavailable — using window.smartRoom"
+- **WebMCP available** — tools register, Stage 4 badge shows green "N tools registered"
+- **WebMCP unavailable** — badge shows amber "WebMCP unavailable — using window.smartRoom"
 - The conference demo works in both cases — the visual story never breaks
 
 ---
 
 ## Testing the capability layer today
 
-Even without a WebMCP-enabled browser, you can verify the real capability layer:
+Even without a WebMCP-enabled browser, the real capability layer is accessible.
 
 ### DevTools Console
 
@@ -62,11 +85,11 @@ Even without a WebMCP-enabled browser, you can verify the real capability layer:
 // One call — same as the WebMCP tool execute() callback
 window.smartRoom.setRoomMode("night-coding")
 
-// Verify state
+// State is updated synchronously (state changes; animations are visual-only)
 window.smartRoom.getState()
 // → { computer: true, roomLight: false, deskLamp: true, curtains: "closed" }
 
-// Try other modes
+// Other modes
 window.smartRoom.setRoomMode("presentation")
 window.smartRoom.setRoomMode("reset")
 
@@ -89,7 +112,7 @@ The `tests/capability-api.spec.ts` file proves:
 3. `resetRoom()` returns to the initial state
 4. All capability functions are exposed and callable
 
-These tests run against the same function layer that WebMCP `execute()` callbacks call — proving the story is real, not simulated.
+State assertions use the synchronous state model — `setRoomMode` and `getState` are called in the same `page.evaluate` to eliminate any timing ambiguity. Three.js animations are visual-only and do not affect the state module.
 
 ---
 
@@ -102,6 +125,7 @@ These tests run against the same function layer that WebMCP `execute()` callback
 | `turnOnDeskLamp` | Turn on the warm desk lamp | none |
 | `closeCurtains` | Close the curtains | none |
 | `setRoomMode` | Prepare the room for a named mode | `mode: "night-coding" \| "presentation" \| "sleep" \| "reset"` |
+| `resetRoom` | Reset the Smart Room to initial state | none |
 
 ---
 

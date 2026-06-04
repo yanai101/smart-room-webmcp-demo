@@ -16,5 +16,5 @@
     /* Linting */
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["main.ts"]
+  "include": ["src"]
 }
