@@ -12,6 +12,18 @@ The Smart Room's controls are rendered entirely inside a `<canvas>` using Three.
 
 ---
 
+## Visual stage logs vs real Playwright tests
+
+The demo has two separate layers:
+
+**Stage 3 visual logs** (`src/stages/stageData.ts`) — scripted storytelling for the conference audience. They simulate Playwright MCP commands (`browser_snapshot`, `browser_click`, etc.) with timed delays to create a believable narrative. They also call `roomActions` directly to animate the Three.js scene. These are presentation artifacts.
+
+**Playwright tests** (`tests/traditional-playwright.spec.ts`) — real Playwright assertions that prove the technical claim. They assert absence: zero DOM elements exist for room controls, because the room lives in `<canvas>`. These tests run with `npm run test:pw` and pass deterministically.
+
+The visual logs tell the story. The tests prove the claim.
+
+---
+
 ## Setup
 
 ### Option 1 — Official Playwright MCP server (recommended)
@@ -64,8 +76,7 @@ The agent will:
 - See the app shell (nav buttons, panel, canvas) but **not** the Three.js room objects
 - Use visual reasoning and screenshots to identify the UI
 - Try to find controls for "computer", "room light", "desk lamp", "curtains"
-- Eventually discover it must interact through available UI elements or conclude the controls aren't accessible
-- May succeed via the stage navigation UI, but cannot directly manipulate the room
+- May succeed via the stage navigation UI, but cannot directly manipulate the room objects
 
 This is the contrast with Stage 4 (WebMCP): the agent has browser access but not capability access.
 
@@ -79,30 +90,22 @@ After the agent attempts to complete the task, ask it:
 What DOM elements represent the computer, the desk lamp, and the curtains?
 ```
 
-**Expected answer**: It should not find real DOM elements for those objects, because they are Three.js meshes rendered inside `<canvas id="room">`.
-
-This is the moment that sets up the WebMCP transition: the agent has full browser access and still cannot directly address the application's capabilities.
+**Expected answer**: It should not find real DOM elements for those objects, because they are Three.js meshes rendered inside `<canvas id="room">`. The `tests/traditional-playwright.spec.ts` file proves this with explicit assertions.
 
 ---
 
 ## Running the Playwright tests
 
-These tests prove the same thing in code:
-
 ```bash
-npm run test:pw
+npm run test:pw          # headless
+npm run test:pw:headed   # with visible browser
+npm run test:pw:ui       # with Playwright UI explorer
 ```
 
-Or with a visible browser:
+The three test files map directly to the talk's three automation approaches:
 
-```bash
-npm run test:pw:headed
-```
-
-Or with the Playwright UI:
-
-```bash
-npm run test:pw:ui
-```
-
-The tests in `tests/traditional-playwright.spec.ts` assert that **zero** DOM elements exist for room objects — reproducing exactly what an agent running `getByRole` would encounter.
+| File | Stage | What it proves |
+|---|---|---|
+| `manual-pixel-clicks.spec.ts` | Stage 1 | Pixel clicks don't reach target state |
+| `traditional-playwright.spec.ts` | Stage 2 | Zero DOM elements exist for room objects |
+| `capability-api.spec.ts` | Stage 4 | Capability layer reaches state deterministically |
